@@ -1,0 +1,20 @@
+.{
+    .name = .lolzutils,
+    .version = "0.0.0",
+    .fingerprint = 0x211770c90d837c75,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .zeit = .{
+            .url = "https://github.com/rockorager/zeit/archive/refs/tags/v0.8.0.tar.gz",
+            .hash = "zeit-0.6.0-5I6bk7q6AgBdMJxze3D4l9ylQhkviQ_BX9FigDt13MFn",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        // For example...
+        "LICENSE",
+        "README.md",
+    },
+}
