@@ -2,6 +2,8 @@
 
 coreutils reimpl. // A small collection of core utilities for *Nix written in Zig.
 
+it is not finished. btw.
+
 ## Build
 
 ```bash
