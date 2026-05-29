@@ -67,6 +67,7 @@ pub fn build(b: *std.Build) void {
     try makeProgram(b, g, "touch", false);
     try makeProgram(b, g, "b2sum", false);
     try makeProgram(b, g, "md5sum", false);
+    try makeProgram(b, g, "sha1sum", false);
     try makeProgram(b, g, "sha256sum", false);
     try makeProgram(b, g, "sha512sum", false);
 }
