@@ -6,10 +6,6 @@ const Io = std.Io;
 const core = @import("core");
 const zeit = @import("zeit");
 
-const C = @cImport({
-    @cInclude("time.h");
-});
-
 // TODO: remove when zig will handle ENOENT properly in setTimestamps
 pub const std_options = std.Options{
     .unexpected_error_tracing = false,
