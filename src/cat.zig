@@ -60,8 +60,8 @@ fn help(out: *Io.Writer) !void {
         \\  --help: display this help and exit
         \\  --version: output version information and exit
         \\
-        \\Report bugs to 
-    ++ core.ISSUE_TRACKER ++ "\n");
+        \\
+    ++ core.HELP_FOOTER ++ "\n");
 }
 
 fn version(out: *Io.Writer) !void {

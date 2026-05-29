@@ -5,7 +5,7 @@ pub const os = builtin.os.tag;
 pub const allocator = if (builtin.mode == .Debug) std.heap.page_allocator else std.heap.smp_allocator;
 
 pub const VERSION = "0.1";
-pub const ISSUE_TRACKER = "codeberg.org/v3nntrnx/lolzutils";
+pub const HELP_FOOTER = "Report bugs to: codeberg.org/v3nntrnx/lolzutils";
 pub const HELP_FOOTER_LN = "Use --help for more information\n";
 pub const COPYRIGHT_LICENSE_FOOTER =
     \\Copyright (C) 2026 v3nntrnx

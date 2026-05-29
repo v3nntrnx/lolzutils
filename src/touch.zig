@@ -390,15 +390,29 @@ pub fn main(init: std.process.Init) !u8 {
 
 fn help(out: *Io.Writer) !u8 {
     try out.writeAll(
-        \\Usage: touch <?Option>
+        \\Usage: touch <?Option(s)> File(s)
         \\Create/Change the access and/or modification time of a file.
+        \\by default, the current time is used
         \\
         \\Option(s):
         \\  --help: display this help and exit
         \\  --version: output version information and exit
+        \\  -a: change only the access time
+        \\  -c, --no-create: do not create the file if it does not exist
+        \\  -d, --date=DATE: date to be used instead of current date
+        \\  -f: ignored (BSD compatibility)
+        \\  -h, --no-dereference: do not dereference symbolic links
+        \\  -m: change only the modification time
+        \\  -r, --reference=FILE: set the access and modification times to those of the reference file
+        \\  -t TIME: time to be used instead of current time in the format of [[CC]YY]MMDDhhmm[.SS]
+        \\  --time=(access|atime|use|modify|mtime): time to be changed (like -a, -m)
+        \\  
+        \\Note:
+        \\  if neither -a nor -m is specified, both times are changed
+        \\  if both are specified, then both are changed (also the default behaviour).
         \\
-        \\Report bugs to 
-    ++ core.ISSUE_TRACKER ++ "\n");
+        \\
+    ++ core.HELP_FOOTER ++ "\n");
     return 0;
 }
 
