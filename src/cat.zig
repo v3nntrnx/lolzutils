@@ -122,7 +122,7 @@ fn restream(io: Io, src: Io.File, dest: *Io.Writer, opts: *Options, data: *Data)
 
             var start_idx: usize = 0;
             while (std.mem.findScalarPos(u8, line_str, start_idx, '\n')) |nl| {
-                var to_pad: i32 = @as(i32, @intCast(data.l_padding)) - @as(i32, @intCast(num_width(data.line)));
+                var to_pad: i32 = @as(i32, @intCast(data.l_padding)) - @as(i32, @intCast(width_u32(data.line)));
 
                 if (to_pad == -1) {
                     data.l_padding += 1;
@@ -148,12 +148,15 @@ fn restream(io: Io, src: Io.File, dest: *Io.Writer, opts: *Options, data: *Data)
     return;
 }
 
-fn num_width(_n: u32) u32 {
-    var n = _n;
-    var width: u32 = 1;
-    while (n >= 10) {
-        width += 1;
-        n /= 10;
-    }
-    return width;
+fn width_u32(n: u32) u32 {
+    if (n < 10) return 1;
+    if (n < 100) return 2;
+    if (n < 1_000) return 3;
+    if (n < 10_000) return 4;
+    if (n < 100_000) return 5;
+    if (n < 1_000_000) return 6;
+    if (n < 10_000_000) return 7;
+    if (n < 100_000_000) return 8;
+    if (n < 1_000_000_000) return 9;
+    return 10;
 }
