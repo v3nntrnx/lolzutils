@@ -1,5 +1,6 @@
 // https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cat.html
 // https://elixir.bootlin.com/busybox/1.37.0/source/coreutils/cat.c
+// TODO: do gnu/coreutils stuff like using line_buf
 const std = @import("std");
 const Io = std.Io;
 
@@ -9,10 +10,7 @@ const Options = struct {
     enumerate_lines: bool = false,
 };
 
-const ShortOpt = enum {
-    n,
-    u,
-};
+const ShortOpt = enum { n, u };
 
 const LongOpt = enum {
     help,
@@ -20,9 +18,6 @@ const LongOpt = enum {
 };
 
 pub fn main(init: std.process.Init) !u8 {
-    var iter = init.minimal.args.iterate();
-    _ = iter.next() orelse unreachable;
-
     var stdout_buf: [core.BUF_SIZE]u8 = undefined;
     var stdout_writer = Io.File.stdout().writer(init.io, &stdout_buf);
     defer stdout_writer.flush() catch @panic("Buffer flush error!");
