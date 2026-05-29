@@ -1,7 +1,23 @@
+// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cat.html
+// https://elixir.bootlin.com/busybox/1.37.0/source/coreutils/cat.c
 const std = @import("std");
 const Io = std.Io;
 
 const core = @import("core");
+
+const Options = struct {
+    enumerate_lines: bool = false,
+};
+
+const ShortOpt = enum {
+    n,
+    u,
+};
+
+const LongOpt = enum {
+    help,
+    version,
+};
 
 pub fn main(init: std.process.Init) !u8 {
     var iter = init.minimal.args.iterate();
@@ -13,21 +29,30 @@ pub fn main(init: std.process.Init) !u8 {
 
     const stdout = &stdout_writer.interface;
 
-    var r_argc: usize = 0;
+    var opts: Options = .{};
 
-    o: while (iter.next()) |arg| : (r_argc += 1) {
-        if (std.mem.eql(u8, arg, "--help")) {
-            try help(stdout);
-            return 0;
+    var parser: core.Parser(ShortOpt, LongOpt) = .init(init.minimal.args.iterate(), core.allocator);
+    defer parser.deinit();
+
+    while (try parser.nextPreserveArg()) |arg| {
+        switch (arg) {
+            .Arg => {},
+            .Long => |l| switch (l.name) {
+                .help => return try help(stdout),
+                .version => return try version(stdout),
+            },
+            .Short => |s| while (try s.next()) |c| switch (c) {
+                .n => opts.enumerate_lines = true,
+                .u => {},
+            },
         }
+    }
 
-        if (std.mem.eql(u8, arg, "--version")) {
-            try version(stdout);
-            return 0;
-        }
+    var data: Data = .{};
 
+    o: for (parser.args.items) |arg| {
         if (std.mem.eql(u8, arg, "-")) {
-            try restream(init.io, Io.File.stdin(), stdout);
+            try restream(init.io, Io.File.stdin(), stdout, &opts, &data);
             continue :o;
         }
 
@@ -41,16 +66,16 @@ pub fn main(init: std.process.Init) !u8 {
         };
         defer file.close(init.io);
 
-        try restream(init.io, file, stdout);
+        try restream(init.io, file, stdout, &opts, &data);
     }
 
-    if (r_argc == 0)
-        try restream(init.io, Io.File.stdin(), stdout);
+    if (parser.args.items.len == 0)
+        try restream(init.io, Io.File.stdin(), stdout, &opts, &data);
 
     return 0;
 }
 
-fn help(out: *Io.Writer) !void {
+fn help(out: *Io.Writer) !u8 {
     try out.writeAll(
         \\Usage: cat <?Option(s)> <?File(s)>
         \\Concatenate files and print on the standard output. meow ^-^
@@ -59,19 +84,76 @@ fn help(out: *Io.Writer) !void {
         \\Option(s):
         \\  --help: display this help and exit
         \\  --version: output version information and exit
-        \\
+        \\  -u: (ignored, POSIX compliance)
+        \\  -n: number all output lines
         \\
     ++ core.HELP_FOOTER ++ "\n");
+    return 0;
 }
 
-fn version(out: *Io.Writer) !void {
+fn version(out: *Io.Writer) !u8 {
     try out.writeAll(
         \\cat v
     ++ core.VERSION ++ "\n" ++ core.COPYRIGHT_LICENSE_FOOTER ++ "\n");
+    return 0;
 }
 
-fn restream(io: Io, src: Io.File, dest: *Io.Writer) !void {
-    var stdin_buf: [core.BUF_SIZE]u8 = undefined;
-    var stdin_reader = src.reader(io, &stdin_buf);
-    _ = try (&stdin_reader.interface).streamRemaining(dest);
+const Data = struct {
+    l_padding: u32 = 6,
+    line: u32 = 1,
+};
+
+// *const may be optional, but i think its a good optimization(?)
+fn restream(io: Io, src: Io.File, dest: *Io.Writer, opts: *Options, data: *Data) !void {
+    var src_buf: [core.BUF_SIZE]u8 = undefined;
+    var src_reader = src.reader(io, &src_buf);
+    var srcr = &src_reader.interface;
+
+    if (opts.enumerate_lines) {
+        var line_buf: [core.BUF_SIZE]u8 = undefined;
+
+        while (true) {
+            const l = srcr.readSliceShort(&line_buf) catch |err| core.sft_err("Failed to read file: {s}", .{core.err_to_string(err)});
+
+            if (l == 0)
+                return;
+
+            const line_str = line_buf[0..l];
+
+            var start_idx: usize = 0;
+            while (std.mem.findScalarPos(u8, line_str, start_idx, '\n')) |nl| {
+                var to_pad: i32 = @as(i32, @intCast(data.l_padding)) - @as(i32, @intCast(num_width(data.line)));
+
+                if (to_pad == -1) {
+                    data.l_padding += 1;
+                    to_pad += 1;
+                }
+
+                for (0..@intCast(to_pad)) |_|
+                    try dest.writeByte(' ');
+                try dest.print("{d}", .{data.line});
+                try dest.writeByte('\t');
+
+                defer start_idx = nl + 1;
+                try dest.writeAll(line_str[start_idx .. nl + 1]);
+
+                data.line += 1;
+            }
+        }
+
+        unreachable;
+    }
+
+    _ = try srcr.streamRemaining(dest);
+    return;
+}
+
+fn num_width(_n: u32) u32 {
+    var n = _n;
+    var width: u32 = 1;
+    while (n >= 10) {
+        width += 1;
+        n /= 10;
+    }
+    return width;
 }

@@ -185,7 +185,7 @@ pub fn main(init: std.process.Init) !u8 {
             .tz = init.environ_map.get("TZ"),
         };
 
-        var local_tz = (try zeit.local(init.gpa, init.io, env_config));
+        var local_tz = (try zeit.local(core.allocator, init.io, env_config));
         defer local_tz.deinit();
 
         var tz_instant = try zeit.instant(init.io, .{
@@ -302,12 +302,12 @@ pub fn main(init: std.process.Init) !u8 {
 
     if (opts.date) |_date_str| {
         var date_str = _date_str;
-        defer if (date_str.len != _date_str.len) init.gpa.free(date_str);
+        defer if (date_str.len != _date_str.len) core.allocator.free(date_str);
 
         // a hack to support [+/-]hh:mm with trailing space before +
         // e.g 2004-01-16 12:00 +0000 would remove space before +
         if (std.mem.find(u8, date_str, " +")) |trailing_plus| {
-            const dt = init.gpa.dupe(u8, date_str[0 .. date_str.len - 1]) catch @panic("OOM");
+            const dt = core.allocator.dupe(u8, date_str[0 .. date_str.len - 1]) catch @panic("OOM");
             std.mem.copyForwards(
                 u8,
                 dt[trailing_plus..],
@@ -391,7 +391,7 @@ pub fn main(init: std.process.Init) !u8 {
 fn help(out: *Io.Writer) !u8 {
     try out.writeAll(
         \\Usage: touch <?Option(s)> File(s)
-        \\Create/Change the access and/or modification time of a file.
+        \\Create/Change the access and/or modification time of a file
         \\by default, the current time is used
         \\
         \\Option(s):
@@ -409,7 +409,7 @@ fn help(out: *Io.Writer) !u8 {
         \\  
         \\Note:
         \\  if neither -a nor -m is specified, both times are changed
-        \\  if both are specified, then both are changed (also the default behaviour).
+        \\  if both are specified, then both are changed (also the default behaviour)
         \\
         \\
     ++ core.HELP_FOOTER ++ "\n");
