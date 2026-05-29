@@ -104,12 +104,11 @@ pub fn Parser(comptime ShortOpt: type, comptime LongOption: type) type {
         }
 
         pub fn next(self: *@This()) !?ParsedArg {
-            defer self.indexed += 1;
-
             if (self.indexed == 0)
                 _ = self.iter.next() orelse unreachable;
 
             const arg = self.iter.next() orelse return null;
+            defer self.indexed += 1;
 
             if (std.mem.startsWith(u8, arg, "--")) {
                 if (arg.len > 2)
