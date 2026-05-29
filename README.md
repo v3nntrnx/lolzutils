@@ -22,3 +22,9 @@ zig build run-<app name>
 
 - https://busybox.net/
 - https://github.com/coreutils/coreutils
+- https://pubs.opengroup.org/onlinepubs/9799919799/
+
+## Notes
+
+AI has been used to create tests and during coding. It's fine use AI as an tool, just don't vibecode.
+Not using AI is a huge flex though. Look for NOTE.txt in the code for other notes.
