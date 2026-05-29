@@ -1,0 +1,7 @@
+A lot of tests are ported from coreutils. (w/ AI, check README)
+Some stuff is not POSIX valid and fails in busybox and have been commented out.
+relative.sh from coreutils is left out because it is not valid POSIX.
+
+See also:
+- https://elixir.bootlin.com/busybox/1.37.0/source/testsuite/touch
+- https://github.com/coreutils/coreutils/tree/master/tests/touch
