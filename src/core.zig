@@ -28,6 +28,15 @@ pub fn sft_err(comptime f: []const u8, args: anytype) u8 {
 }
 
 pub fn err_to_string(err: anyerror) []const u8 {
+    if (err == error.FileNotFound)
+        return "No such file or directory";
+
+    if (err == error.IsDir)
+        return "Is a directory";
+
+    if (err == error.AccessDenied)
+        return "Access denied";
+
     return @errorName(err);
 }
 
@@ -51,9 +60,17 @@ pub fn Parser(comptime ShortOpt: type, comptime LongOption: type) type {
                     return error.TrailingCharactersInShortOption;
             }
 
+            pub inline fn peek(self: *ShortOptIterator) u8 {
+                return self.arg[self.index];
+            }
+
+            pub inline fn peekBack(self: *ShortOptIterator) u8 {
+                return self.arg[self.index -| 1];
+            }
+
             inline fn advance(self: *ShortOptIterator) u8 {
                 defer self.index += 1;
-                return self.arg[self.index];
+                return self.peek();
             }
         };
 
@@ -94,10 +111,18 @@ pub fn Parser(comptime ShortOpt: type, comptime LongOption: type) type {
 
             const arg = self.iter.next() orelse return null;
 
-            if (std.mem.startsWith(u8, arg, "--") and arg.len > 2) {
-                return ParsedArg{
-                    .Long = try self.parseLongOption(arg),
-                };
+            if (std.mem.startsWith(u8, arg, "--")) {
+                if (arg.len > 2)
+                    return ParsedArg{
+                        .Long = try self.parseLongOption(arg),
+                    };
+
+                // POSIX defines -- as the end of options.
+                while (self.iter.next()) |next_arg| {
+                    try self.preserve(next_arg);
+                }
+
+                return null;
             }
 
             if (std.mem.startsWith(u8, arg, "-") and arg.len > 1) {
@@ -117,9 +142,13 @@ pub fn Parser(comptime ShortOpt: type, comptime LongOption: type) type {
             const nx = try self.next() orelse return null;
 
             if (nx == .Arg)
-                try self.args.append(self.gpa, nx.Arg);
+                try self.preserve(nx.Arg);
 
             return nx;
+        }
+
+        pub fn preserve(self: *@This(), arg: []const u8) !void {
+            try self.args.append(self.gpa, arg);
         }
 
         /// Unpreseved!!! e.g. If the next argument is an option, it will not be saved in self.args.
@@ -145,9 +174,72 @@ pub fn Parser(comptime ShortOpt: type, comptime LongOption: type) type {
                 if (i >= raw_long_opt.len - 1)
                     return error.InvalidLongOption;
 
+                var lookup_quote: u8 = '\'';
+
+                e: while (true) {
+                    if (raw_long_opt[i + 1] == lookup_quote) {
+                        const begin_first_quote_pos = i + 1;
+                        const maybe_end_first_quote_pos = std.mem.lastIndexOfScalar(u8, raw_long_opt[begin_first_quote_pos + 1 ..], '\'');
+
+                        if (maybe_end_first_quote_pos) |end_first_quote_pos| o: {
+                            if (end_first_quote_pos == begin_first_quote_pos)
+                                break :o;
+
+                            return ParsedLongOption{
+                                .name = long_opt,
+                                .arg = raw_long_opt[begin_first_quote_pos + 1 .. end_first_quote_pos],
+                                .passed_by_eq = true,
+                            };
+                        }
+
+                        var parsed_long_opt_arg: std.ArrayList(u8) = .empty;
+                        defer parsed_long_opt_arg.deinit(self.gpa);
+
+                        try parsed_long_opt_arg.appendSlice(self.gpa, raw_long_opt[begin_first_quote_pos + 1 ..]);
+
+                        i: {
+                            while (self.iter.next()) |next_arg| {
+                                if (std.mem.indexOfScalar(
+                                    u8,
+                                    next_arg,
+                                    lookup_quote,
+                                )) |closing_quote_pos| {
+                                    if (closing_quote_pos != next_arg.len - 1) {
+                                        return error.ClosingQuoteMustBeLastCharacter;
+                                    }
+
+                                    const str = next_arg[0..closing_quote_pos -| 1];
+
+                                    try parsed_long_opt_arg.appendSlice(self.gpa, str);
+                                    break :i;
+                                }
+
+                                try parsed_long_opt_arg.appendSlice(self.gpa, next_arg);
+                                try parsed_long_opt_arg.appendSlice(self.gpa, " ");
+                            }
+
+                            return error.ClosingQuoteNotFound;
+                        }
+
+                        return ParsedLongOption{
+                            .name = long_opt,
+                            .arg = try parsed_long_opt_arg.toOwnedSlice(self.gpa),
+                            .passed_by_eq = true,
+                        };
+                    }
+
+                    if (lookup_quote == '\'') {
+                        lookup_quote = '"';
+                        continue :e;
+                    }
+
+                    break :e;
+                }
+
                 return ParsedLongOption{
                     .name = long_opt,
                     .arg = raw_long_opt[i + 1 ..],
+                    .passed_by_eq = true,
                 };
             }
 
@@ -184,6 +276,7 @@ pub fn Parser(comptime ShortOpt: type, comptime LongOption: type) type {
         pub const ParsedLongOption = struct {
             name: LongOption,
             arg: ?[]const u8,
+            passed_by_eq: bool = false,
         };
     };
 }
