@@ -40,9 +40,10 @@ pub fn Make(comptime name: []const u8, comptime description: []const u8, comptim
                 }
             }
 
-            for (parser.args.items) |arg| {
+            o: for (parser.args.items) |arg| {
                 if (std.mem.eql(u8, arg, "-")) {
-                    unreachable;
+                    try restream(init.io, Io.File.stdin(), stdout, "-");
+                    continue :o;
                 }
 
                 const file = std.Io.Dir.cwd().openFile(init.io, arg, .{ .mode = .read_only }) catch |err| {
@@ -51,30 +52,15 @@ pub fn Make(comptime name: []const u8, comptime description: []const u8, comptim
                         else => core.sft_err("Unknown option '{s}' +{s}", .{ arg, core.err_to_string(err) }),
                     };
 
-                    continue;
+                    continue :o;
                 };
                 defer file.close(init.io);
 
-                var read_buf: [core.BUF_SIZE]u8 = undefined;
-                var reader = file.reader(init.io, &read_buf);
+                try restream(init.io, file, stdout, arg);
+            }
 
-                var hasher = HashClass.init(.{});
-                var hash_buf: [core.BUF_SIZE]u8 = undefined;
-
-                var discarding_buf: [core.BUF_SIZE]u8 = undefined;
-                var discarding_writer = std.Io.Writer.Discarding.init(&discarding_buf);
-
-                var hashed_writer = std.Io.Writer.hashed(&discarding_writer.writer, &hasher, &hash_buf);
-
-                _ = try reader.interface.streamRemaining(&hashed_writer.writer);
-
-                try hashed_writer.writer.flush();
-                try discarding_writer.writer.flush();
-
-                var final_hash: [HashClass.digest_length]u8 = undefined;
-                hasher.final(&final_hash);
-
-                try stdout.print("{x}  {s}\n", .{ &final_hash, arg });
+            if (parser.args.items.len == 0) {
+                try restream(init.io, Io.File.stdin(), stdout, "-");
             }
 
             return 0;
@@ -101,6 +87,29 @@ pub fn Make(comptime name: []const u8, comptime description: []const u8, comptim
         fn version(out: *Io.Writer) !u8 {
             try out.writeAll(name ++ " v" ++ core.VERSION ++ "\n" ++ core.COPYRIGHT_LICENSE_FOOTER ++ "\n");
             return 0;
+        }
+
+        fn restream(io: Io, file: Io.File, dest: *Io.Writer, friendly_name: []const u8) !void {
+            var read_buf: [core.BUF_SIZE]u8 = undefined;
+            var reader = file.reader(io, &read_buf);
+
+            var hasher = HashClass.init(.{});
+            var hash_buf: [core.BUF_SIZE]u8 = undefined;
+
+            var discarding_buf: [core.BUF_SIZE]u8 = undefined;
+            var discarding_writer = std.Io.Writer.Discarding.init(&discarding_buf);
+
+            var hashed_writer = std.Io.Writer.hashed(&discarding_writer.writer, &hasher, &hash_buf);
+
+            _ = try reader.interface.streamRemaining(&hashed_writer.writer);
+
+            try hashed_writer.writer.flush();
+            try discarding_writer.writer.flush();
+
+            var final_hash: [HashClass.digest_length]u8 = undefined;
+            hasher.final(&final_hash);
+
+            try dest.print("{x}  {s}\n", .{ &final_hash, friendly_name });
         }
     }.main;
 }
