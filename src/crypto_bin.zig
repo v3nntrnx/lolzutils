@@ -14,7 +14,17 @@ const LongOpt = enum {
 };
 
 // returns function to be used with main
-pub fn Make(comptime name: []const u8, comptime description: []const u8, comptime HashClass: anytype) fn (std.process.Init) anyerror!u8 {
+pub fn Make(
+    comptime Hasher: type,
+    comptime hash_buf_size: comptime_int,
+    comptime program: struct {
+        name: []const u8,
+        help: *const fn (*Io.Writer) anyerror!u8,
+        init_hash: *const fn () Hasher,
+        final_hash: *const fn (*Hasher, buf: *[hash_buf_size]u8, bytes_written: usize) anyerror![]const u8,
+        print_hash: *const fn (*Io.Writer, buf: []const u8, bytes_written: usize) anyerror!void,
+    },
+) fn (std.process.Init) anyerror!u8 {
     return struct {
         pub fn main(init: std.process.Init) !u8 {
             var iter = init.minimal.args.iterate();
@@ -33,7 +43,7 @@ pub fn Make(comptime name: []const u8, comptime description: []const u8, comptim
                 switch (arg) {
                     .Arg => {},
                     .Long => |l| switch (l.name) {
-                        .help => return try help(stdout),
+                        .help => return try program.help(stdout),
                         .version => return try version(stdout),
                     },
                     .Short => |s| while (try s.next()) |c| switch (c) {},
@@ -66,26 +76,8 @@ pub fn Make(comptime name: []const u8, comptime description: []const u8, comptim
             return 0;
         }
 
-        fn help(out: *Io.Writer) !u8 {
-            try out.writeAll(
-                \\Usage: 
-            ++ name ++
-                \\ <?Option(s)> <?File(s)>
-                \\
-            ++ description ++
-                \\
-                \\
-                \\Option(s):
-                \\  --help: display this help and exit
-                \\  --version: output version information and exit
-                \\
-                \\
-            ++ core.HELP_FOOTER ++ "\n");
-            return 0;
-        }
-
         fn version(out: *Io.Writer) !u8 {
-            try out.writeAll(name ++ " v" ++ core.VERSION ++ "\n" ++ core.COPYRIGHT_LICENSE_FOOTER ++ "\n");
+            try out.writeAll(program.name ++ " v" ++ core.VERSION ++ "\n" ++ core.COPYRIGHT_LICENSE_FOOTER ++ "\n");
             return 0;
         }
 
@@ -93,7 +85,8 @@ pub fn Make(comptime name: []const u8, comptime description: []const u8, comptim
             var read_buf: [core.BUF_SIZE]u8 = undefined;
             var reader = file.reader(io, &read_buf);
 
-            var hasher = HashClass.init(.{});
+            var hasher = program.init_hash();
+
             var hash_buf: [core.BUF_SIZE]u8 = undefined;
 
             var discarding_buf: [core.BUF_SIZE]u8 = undefined;
@@ -101,15 +94,27 @@ pub fn Make(comptime name: []const u8, comptime description: []const u8, comptim
 
             var hashed_writer = std.Io.Writer.hashed(&discarding_writer.writer, &hasher, &hash_buf);
 
-            _ = try reader.interface.streamRemaining(&hashed_writer.writer);
+            const bytes_written = try reader.interface.streamRemaining(&hashed_writer.writer);
 
             try hashed_writer.writer.flush();
             try discarding_writer.writer.flush();
 
-            var final_hash: [HashClass.digest_length]u8 = undefined;
-            hasher.final(&final_hash);
+            var final_hash_buf: [hash_buf_size]u8 = undefined;
 
-            try dest.print("{x}  {s}\n", .{ &final_hash, friendly_name });
+            const final_hash = try program.final_hash(&hasher, &final_hash_buf, bytes_written);
+            try program.print_hash(dest, final_hash, bytes_written);
+
+            try dest.writeAll(friendly_name);
+            try dest.writeAll("\n");
         }
     }.main;
+}
+
+fn num_or_null(comptime t: anytype) comptime_int {
+    const type_info = @typeInfo(@TypeOf(t));
+
+    return switch (type_info) {
+        .comptime_int, .int => t,
+        else => 0,
+    };
 }

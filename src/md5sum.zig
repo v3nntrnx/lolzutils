@@ -1,8 +1,45 @@
 const std = @import("std");
-const crypto_bins = @import("crypto_bins.zig");
 
-pub const main = crypto_bins.Make(
-    "md5sum",
-    "compute MD5 checksums",
-    std.crypto.hash.Md5,
+const core = @import("core");
+const crypto_bin = @import("crypto_bin.zig");
+
+pub const main = crypto_bin.Make(
+    Hasher,
+    Hasher.digest_length,
+    .{
+        .name = "md5sum",
+        .help = &help,
+        .init_hash = &init_hash,
+        .final_hash = &final_hash,
+        .print_hash = &print_hash,
+    },
 );
+
+const Hasher = std.crypto.hash.Md5;
+
+fn init_hash() Hasher {
+    return Hasher.init(.{});
+}
+
+fn final_hash(hasher: *Hasher, buf: *[Hasher.digest_length]u8, _: usize) anyerror![]const u8 {
+    hasher.final(buf);
+    return buf;
+}
+
+fn print_hash(dest: *std.Io.Writer, buf: []const u8, _: usize) anyerror!void {
+    try dest.print("{x}  ", .{buf});
+}
+
+pub fn help(writer: *std.Io.Writer) !u8 {
+    try writer.writeAll(
+        \\Usage: md5sum <?Option(s)> <?File(s)>
+        \\Print or check MD5 checksums
+        \\
+        \\Option(s):
+        \\  --help: display this help and exit
+        \\  --version: output version information and exit
+        \\
+        \\
+    ++ core.HELP_FOOTER ++ "\n");
+    return 0;
+}

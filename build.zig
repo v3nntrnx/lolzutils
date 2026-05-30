@@ -15,8 +15,8 @@ pub fn makeProgram(
 ) !void {
     const exe = b.addExecutable(.{
         .name = name,
-        .use_lld = true,
-        .use_llvm = true,
+        .use_lld = libc,
+        .use_llvm = libc,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/" ++ name ++ ".zig"),
             .target = g.target,
@@ -66,6 +66,7 @@ pub fn build(b: *std.Build) void {
     try makeProgram(b, g, "whoami", true);
     try makeProgram(b, g, "touch", false);
     try makeProgram(b, g, "b2sum", false);
+    try makeProgram(b, g, "cksum", false);
     try makeProgram(b, g, "md5sum", false);
     try makeProgram(b, g, "sha1sum", false);
     try makeProgram(b, g, "sha256sum", false);
