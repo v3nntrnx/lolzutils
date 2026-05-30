@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const core = @import("core");
-const crypto_bin = @import("crypto_bin.zig");
+const crypto_bin = @import("./common/crypto_bin.zig");
 
 pub const digest_length = 12;
 
