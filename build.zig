@@ -46,7 +46,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const core_mod = b.addModule("core", .{
-        .root_source_file = b.path("src/core.zig"),
+        .root_source_file = b.path("src/common/core.zig"),
         .target = target,
         .optimize = optimize,
     });
